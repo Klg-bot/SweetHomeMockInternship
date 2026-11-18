@@ -2004,10 +2004,65 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
   }
   
   /**
+   * 
+   * Prints the page at {@code pageIndex} of the plan printout covering all viewable levels: the master-printable.
+   * 
+   */
+  public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
+    List<Level> levels = this.home.getLevels();
+    if (levels.isEmpty()) {
+      return printSelectedLevel(g, pageFormat, pageIndex);
+    }
+    Level selectedLevel = this.home.getSelectedLevel();
+    try {
+      int firstLevelPage = 0;
+      for (Level level : levels) {
+        if (level.isViewable()) {
+          this.home.setSelectedLevel(level);
+          int levelPageCount = getSelectedLevelPageCount(g, pageFormat);
+          if (pageIndex < firstLevelPage + levelPageCount) {
+            return printSelectedLevel(g, pageFormat, pageIndex - firstLevelPage);
+          }
+          firstLevelPage += levelPageCount;
+        }
+      }
+      return NO_SUCH_PAGE;
+    } finally {
+      // Restore selected level even if printing a page failed
+      this.home.setSelectedLevel(selectedLevel);
+    }
+  }
+
+  /**
+   * Returns the number of pages needed to print the plan of the selected level.
+   */
+  private int getSelectedLevelPageCount(Graphics g, PageFormat pageFormat) {
+    Rectangle2D printedItemBounds = getItemsBounds(g, getPaintedItems());
+    if (printedItemBounds == null) {
+      return 0;
+    } else if (this.home.getPrint() == null || this.home.getPrint().getPlanScale() == null) {
+      return 1;
+    } else {
+      float printScale = this.home.getPrint().getPlanScale().floatValue() * LengthUnit.centimeterToInch(72);
+      double imageableWidth = pageFormat.getImageableWidth();
+      double imageableHeight = pageFormat.getImageableHeight();
+      int pagesPerRow = (int)(printedItemBounds.getWidth() * printScale / imageableWidth);
+      if (printedItemBounds.getWidth() * printScale != imageableWidth) {
+        pagesPerRow++;
+      }
+      int pagesPerColumn = (int)(printedItemBounds.getHeight() * printScale / imageableHeight);
+      if (printedItemBounds.getHeight() * printScale != imageableHeight) {
+        pagesPerColumn++;
+      }
+      return pagesPerRow * pagesPerColumn;
+    }
+  }
+
+  /**
    * Prints this component plan at the scale given in the home print attributes or at a scale 
    * that makes it fill <code>pageFormat</code> imageable size if this attribute is <code>null</code>.
    */
-  public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
+  public int printSelectedLevel(Graphics g, PageFormat pageFormat, int pageIndex) {
     List<Selectable> printedItems = getPaintedItems(); 
     Rectangle2D printedItemBounds = getItemsBounds(g, printedItems);
     if (printedItemBounds != null) {
